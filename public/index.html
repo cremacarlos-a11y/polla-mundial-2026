@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polla Mundial 2026 - Pronósticos</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <section class="hero">
+    <div>
+      <h1>⚽ Polla Mundial 2026</h1>
+      <p>Ingresa tus pronósticos antes de que empiecen los partidos.</p>
+    </div>
+    <div class="navlinks"><a class="link" href="/dashboard.html">Ver ranking</a></div>
+  </section>
+
+  <section class="card" id="loginCard">
+    <h2>Identificación</h2>
+    <label>Participante</label>
+    <select id="participante"></select>
+
+    <label>PIN</label>
+    <input id="pin" type="password" placeholder="Ingresa tu PIN">
+
+    <button onclick="login()">Entrar</button>
+    <div id="loginMsg" class="msg"></div>
+  </section>
+
+  <section class="card hidden" id="pronosticosCard">
+    <div class="topline">
+      <h2 id="tituloPronosticos">Tus partidos pendientes</h2>
+      <button class="secondary" onclick="salir()">Cambiar participante</button>
+    </div>
+
+    <div class="rules">
+      <div>Ganador/Empate<br><b>2 pts</b></div>
+      <div>Score exacto<br><b>+4 pts</b></div>
+      <div>Máximo<br><b>6 pts</b></div>
+    </div>
+
+    <div id="contador" class="counterBox">Completados: 0</div>
+    <div id="partidos"></div>
+
+    <div class="stickyActions"><button onclick="mostrarResumen()">💾 Revisar y guardar</button></div>
+    <div id="formMsg" class="msg"></div>
+  </section>
+
+  <section class="card hidden" id="resumenCard">
+    <h2>Confirmar pronósticos</h2>
+    <div id="resumen"></div>
+    <div class="actions">
+      <button onclick="guardarPronosticos()">Confirmar y guardar</button>
+      <button class="secondary" onclick="volverEditar()">Volver a editar</button>
+    </div>
+    <div id="saveMsg" class="msg"></div><div class="section"><h2>📋 Mis pronósticos registrados</h2><div id="misPronosticos"></div></div>
+  </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

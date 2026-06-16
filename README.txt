@@ -1,0 +1,136 @@
+# Polla Mundial 2026 - App v1
+
+Primera versión para que cada participante registre sus propios pronósticos.
+
+## Incluye
+
+- Node.js + Express
+- SQLite
+- Formulario de pronósticos
+- Ranking básico desde SQLite
+- Control de pronósticos por partido
+- Registro de resultados vía API
+
+## Instalación local
+
+1. Descomprimir el ZIP.
+2. Entrar a la carpeta:
+
+```bash
+cd polla_mundial_app_v1
+```
+
+3. Instalar dependencias:
+
+```bash
+npm install
+```
+
+4. Inicializar PINs:
+
+```bash
+npm run init-db
+```
+
+5. Levantar servidor:
+
+```bash
+npm start
+```
+
+6. Abrir:
+
+```text
+http://localhost:3000
+```
+
+## PINs iniciales
+
+- Mary: 1001
+- José: 1002
+- Jesús: 1003
+- Paolo: 1004
+- Juli: 1005
+- Uriel: 1006
+- Daniela: 1007
+- Carlos: 1008
+
+## Flujo
+
+1. Participante entra con nombre y PIN.
+2. Ve partidos pendientes.
+3. Ingresa marcadores.
+4. Revisa resumen.
+5. Guarda.
+6. El pronóstico se registra en SQLite.
+
+## Importante
+
+Esta versión está pensada para probar localmente. Para que todos participen desde internet, el backend debe desplegarse en Render/Railway/Fly.io.
+
+Netlify seguirá siendo útil para el dashboard público estático, pero el formulario con SQLite necesita backend.
+
+
+## Novedades App v2
+
+- Página /admin.html.
+- Registro de resultados desde web.
+- Recalculo automático de puntos al guardar resultado.
+- Control por partido y participante.
+- Panel "Mis pronósticos registrados".
+- Botón fijo para revisar y guardar pronósticos.
+- Contador de pronósticos completados.
+
+## URLs
+
+- Pronósticos: http://localhost:3000/
+- Ranking: http://localhost:3000/dashboard.html
+- Administración: http://localhost:3000/admin.html
+
+## PIN administrador
+
+- admin2026
+
+
+## Actualización de seguridad - Admin oculto
+
+Cambios aplicados:
+- Se quitó el botón Admin de la pantalla principal.
+- Los participantes solo verán:
+  - Registrar pronósticos
+  - Ver ranking
+- El administrador se mantiene disponible solo por URL directa:
+
+http://localhost:3000/admin.html
+
+- Se eliminó el texto visible "PIN inicial: admin2026" de la pantalla de administración.
+
+## Configurar PIN administrador
+
+Por defecto, el backend usa:
+
+admin2026
+
+Para usar un PIN personalizado en Windows CMD:
+
+set ADMIN_PIN=Carlos2026
+npm start
+
+Ejemplo con otro PIN:
+
+set ADMIN_PIN=MiClaveSegura2026
+npm start
+
+Importante:
+Si ya tienes el servidor corriendo, primero detenlo con CTRL + C y luego vuelve a iniciarlo con el comando anterior.
+
+## URLs
+
+Participantes:
+http://localhost:3000/
+
+Ranking:
+http://localhost:3000/dashboard.html
+
+Administrador:
+http://localhost:3000/admin.html

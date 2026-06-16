@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administración - Polla Mundial 2026</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <section class="hero">
+    <div>
+      <h1>⚙️ Administración</h1>
+      <p>Acceso reservado para el administrador de la Polla.</p>
+    </div>
+    <div class="navlinks">
+      <a class="link" href="/">Pronósticos</a>
+      <a class="link secondaryLink" href="/dashboard.html">Ranking</a>
+    </div>
+  </section>
+
+  <section class="gridCards">
+    <div class="card">
+      <h2>📊 Indicadores</h2>
+      <div id="metricas"></div>
+    </div>
+    <div class="card">
+      <h2>🔐 PIN Administrador</h2>
+      <label>PIN</label>
+      <input id="adminPin" type="password" value="admin2026">
+      <div class="msg">Ingrese sus credenciales de administrador.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>⚽ Registrar resultado</h2>
+    <label>Partido</label>
+    <select id="partidoResultado"></select>
+    <div class="scoreAdmin">
+      <input id="golesLocal" type="number" min="0" placeholder="Local">
+      <strong>-</strong>
+      <input id="golesVisitante" type="number" min="0" placeholder="Visitante">
+      <button onclick="guardarResultado()">Guardar resultado</button>
+    </div>
+    <div id="resultadoMsg" class="msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>📋 Control por partido</h2>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Partido</th><th>Esperados</th><th>Registrados</th><th>Pendientes</th></tr></thead>
+        <tbody id="controlPartido"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>👥 Control por participante</h2>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Participante</th><th>Registrados</th><th>Pendientes</th></tr></thead>
+        <tbody id="controlParticipante"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script src="admin.js"></script>
+</body>
+</html>

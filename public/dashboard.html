@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ranking - Polla Mundial 2026</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <section class="hero">
+    <div>
+      <h1>🏆 Ranking Polla Mundial 2026</h1>
+      <p>Ranking leído directamente desde SQLite.</p>
+    </div>
+    <a class="link" href="/">Registrar pronósticos</a>
+  </section>
+
+  <section class="card">
+    <h2>Ranking general</h2>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pos.</th>
+            <th>Participante</th>
+            <th>Puntos</th>
+            <th>Exactos</th>
+            <th>Ganador/Empate</th>
+            <th>Partidos</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Control de pronósticos</h2>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Partido</th>
+            <th>Esperados</th>
+            <th>Registrados</th>
+            <th>Pendientes</th>
+          </tr>
+        </thead>
+        <tbody id="controlBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+const medal = p => Number(p) === 1 ? '🥇' : Number(p) === 2 ? '🥈' : Number(p) === 3 ? '🥉' : p;
+
+async function cargar() {
+  const ranking = await fetch('/api/ranking').then(r => r.json());
+  document.getElementById('rankingBody').innerHTML = ranking.map(r => `
+    <tr>
+      <td>${medal(r.posicion)}</td>
+      <td>${r.participante}</td>
+      <td>${r.puntos}</td>
+      <td>${r.scoreExactos}</td>
+      <td>${r.ganadorEmpate}</td>
+      <td>${r.partidos}</td>
+    </tr>
+  `).join('');
+
+  const control = await fetch('/api/control-pronosticos').then(r => r.json());
+  document.getElementById('controlBody').innerHTML = control.porPartido.slice(0,12).map(r => `
+    <tr>
+      <td>${r.partido}<br><span class="muted">${r.fecha} ${r.hora}</span></td>
+      <td>${r.esperados}</td>
+      <td>${r.registrados}</td>
+      <td>${r.pendientes}</td>
+    </tr>
+  `).join('');
+}
+
+cargar();
+</script>
+</body>
+</html>

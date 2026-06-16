@@ -1,0 +1,16 @@
+{
+  "name": "polla-mundial-2026",
+  "version": "1.0.0",
+  "description": "Sistema familiar de pronósticos Mundial 2026 con Node.js, Express y SQLite",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "init-db": "node scripts/init-db.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
