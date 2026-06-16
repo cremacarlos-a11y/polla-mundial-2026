@@ -134,3 +134,9 @@ http://localhost:3000/dashboard.html
 
 Administrador:
 http://localhost:3000/admin.html
+
+
+## App v3 - Dashboard integrado
+- Dashboard lee directo de SQLite/API.
+- Ya no usa ranking.json ni partidos.json.
+- Endpoints: /api/ranking, /api/dashboard, /api/partidos-dashboard, /api/detalle-participante/:nombre.

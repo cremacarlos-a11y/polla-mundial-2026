@@ -378,6 +378,71 @@ function recalcularPuntosPartido(idPartido, realLocal, realVisitante) {
   tx();
 }
 
+
+app.get('/api/partidos-dashboard', (req, res) => {
+  const proximos = db.prepare(`
+    SELECT 'P' || printf('%03d', p.id_partido) AS id, p.id_partido AS idPartido, p.fecha, p.hora, p.fase, p.grupo,
+           p.equipo_local AS local, p.equipo_visitante AS visitante,
+           p.equipo_local || ' vs ' || p.equipo_visitante AS partido, 'Próximo' AS estado
+    FROM partidos p
+    LEFT JOIN resultados r ON r.id_partido = p.id_partido
+    WHERE COALESCE(r.estado, 'Pendiente') <> 'Registrado'
+    ORDER BY p.fecha, p.hora, p.id_partido
+  `).all();
+
+  const finalizados = db.prepare(`
+    SELECT 'P' || printf('%03d', p.id_partido) AS id, p.id_partido AS idPartido, p.fecha, p.hora, p.fase, p.grupo,
+           p.equipo_local AS local, p.equipo_visitante AS visitante,
+           p.equipo_local || ' vs ' || p.equipo_visitante AS partido, 'Finalizado' AS estado, r.resultado
+    FROM resultados r
+    JOIN partidos p ON p.id_partido = r.id_partido
+    WHERE r.estado = 'Registrado'
+    ORDER BY p.fecha DESC, p.hora DESC, p.id_partido DESC
+    LIMIT 6
+  `).all();
+
+  const resumen = {
+    totalPartidos: db.prepare('SELECT COUNT(*) AS c FROM partidos').get().c,
+    finalizados: db.prepare("SELECT COUNT(*) AS c FROM resultados WHERE estado = 'Registrado'").get().c,
+    pendientes: db.prepare("SELECT COUNT(*) AS c FROM resultados WHERE COALESCE(estado,'Pendiente') <> 'Registrado'").get().c
+  };
+
+  res.json({
+    actualizado: new Date().toLocaleString('es-PE', { hour12: false }),
+    resumen,
+    proximosPartidos: proximos,
+    finalizadosRecientes: finalizados.reverse()
+  });
+});
+
+app.get('/api/detalle-participante/:nombre', (req, res) => {
+  const nombre = req.params.nombre;
+  const participante = db.prepare(`SELECT id_participante, nombre FROM participantes WHERE nombre = ? AND activo = 1`).get(nombre);
+  if (!participante) return res.status(404).json({ error: 'Participante no encontrado.' });
+
+  const ranking = db.prepare(`
+    SELECT posicion, participante, partidos_pronosticados AS partidos, score_exactos AS scoreExactos,
+           aciertos_ganador_empate AS ganadorEmpate, puntos_totales AS puntos
+    FROM v_ranking WHERE participante = ?
+  `).get(nombre);
+
+  const detalle = db.prepare(`
+    SELECT p.fecha, p.hora, p.fase, p.grupo,
+           p.equipo_local || ' vs ' || p.equipo_visitante AS partido,
+           pr.resultado_pronostico AS pronostico,
+           COALESCE(r.resultado, '') AS resultado,
+           pr.criterio, pr.puntos, pr.estado_partido AS estado
+    FROM pronosticos pr
+    JOIN partidos p ON p.id_partido = pr.id_partido
+    LEFT JOIN resultados r ON r.id_partido = p.id_partido
+    WHERE pr.id_participante = ?
+    ORDER BY p.fecha, p.hora, p.id_partido
+  `).all(participante.id_participante);
+
+  res.json({ participante: nombre, ranking, detalle });
+});
+
+
 app.listen(PORT, () => {
   console.log(`Polla Mundial 2026 corriendo en http://localhost:${PORT}`);
 });
