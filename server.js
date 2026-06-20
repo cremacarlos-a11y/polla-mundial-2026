@@ -282,17 +282,43 @@ app.get('/api/dashboard', (req, res) => {
 
 
 app.get('/api/control-pronosticos', (req, res) => {
+  const totalParticipantes = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM participantes
+    WHERE activo = 1
+  `).get().total;
+
+  const totalPartidos = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM partidos
+  `).get().total;
+
   const porPartido = db.prepare(`
-    SELECT *
-    FROM v_control_pronosticos_partido
-    ORDER BY fecha, hora
-  `).all();
+    SELECT
+      p.id_partido,
+      p.fecha,
+      p.hora,
+      p.equipo_local || ' vs ' || p.equipo_visitante AS partido,
+      ? AS esperados,
+      COALESCE(SUM(CASE WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL THEN 1 ELSE 0 END), 0) AS registrados,
+      ? - COALESCE(SUM(CASE WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL THEN 1 ELSE 0 END), 0) AS pendientes
+    FROM partidos p
+    LEFT JOIN pronosticos pr ON pr.id_partido = p.id_partido
+    GROUP BY p.id_partido, p.fecha, p.hora, p.equipo_local, p.equipo_visitante
+    ORDER BY p.fecha, p.hora, p.id_partido
+  `).all(totalParticipantes, totalParticipantes);
 
   const porParticipante = db.prepare(`
-    SELECT *
-    FROM v_control_pronosticos_participante
+    SELECT
+      pa.nombre AS participante,
+      COALESCE(SUM(CASE WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL THEN 1 ELSE 0 END), 0) AS registrados,
+      ? - COALESCE(SUM(CASE WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL THEN 1 ELSE 0 END), 0) AS pendientes
+    FROM participantes pa
+    LEFT JOIN pronosticos pr ON pr.id_participante = pa.id_participante
+    WHERE pa.activo = 1
+    GROUP BY pa.id_participante, pa.nombre
     ORDER BY pendientes DESC, participante
-  `).all();
+  `).all(totalPartidos);
 
   res.json({ porPartido, porParticipante });
 });
@@ -357,18 +383,21 @@ function recalcularPuntosPartido(idPartido, realLocal, realVisitante) {
 
   const tx = db.transaction(() => {
     for (const pr of pronosticos) {
-      const exacto = pr.pronostico_local === realLocal && pr.pronostico_visitante === realVisitante;
-      const aciertaSigno = signo(pr.pronostico_local, pr.pronostico_visitante) === realSigno;
-
-      let criterio = 'Sin puntos';
+      let criterio = 'Sin pronóstico';
       let puntos = 0;
 
-      if (exacto) {
-        criterio = 'Score Exacto';
-        puntos = 6;
-      } else if (aciertaSigno) {
-        criterio = 'Ganador/Empate';
-        puntos = 2;
+      if (pr.pronostico_local !== null && pr.pronostico_visitante !== null) {
+        const exacto = pr.pronostico_local === realLocal && pr.pronostico_visitante === realVisitante;
+        const aciertaSigno = signo(pr.pronostico_local, pr.pronostico_visitante) === realSigno;
+
+        criterio = 'Sin puntos';
+        if (exacto) {
+          criterio = 'Score Exacto';
+          puntos = 6;
+        } else if (aciertaSigno) {
+          criterio = 'Ganador/Empate';
+          puntos = 2;
+        }
       }
 
       upd.run(criterio, puntos, pr.id_pronostico);
@@ -391,18 +420,21 @@ function recalcularPronosticoIndividual(idPronostico, realLocal, realVisitante) 
 
   if (!pr) return;
 
-  const exacto = pr.pronostico_local === realLocal && pr.pronostico_visitante === realVisitante;
-  const aciertaSigno = signo(pr.pronostico_local, pr.pronostico_visitante) === signo(realLocal, realVisitante);
-
-  let criterio = 'Sin puntos';
+  let criterio = 'Sin pronóstico';
   let puntos = 0;
 
-  if (exacto) {
-    criterio = 'Score Exacto';
-    puntos = 6;
-  } else if (aciertaSigno) {
-    criterio = 'Ganador/Empate';
-    puntos = 2;
+  if (pr.pronostico_local !== null && pr.pronostico_visitante !== null) {
+    const exacto = pr.pronostico_local === realLocal && pr.pronostico_visitante === realVisitante;
+    const aciertaSigno = signo(pr.pronostico_local, pr.pronostico_visitante) === signo(realLocal, realVisitante);
+
+    criterio = 'Sin puntos';
+    if (exacto) {
+      criterio = 'Score Exacto';
+      puntos = 6;
+    } else if (aciertaSigno) {
+      criterio = 'Ganador/Empate';
+      puntos = 2;
+    }
   }
 
   db.prepare(`
@@ -508,29 +540,60 @@ app.get('/api/admin/control-partido/:id', (req, res) => {
       pa.nombre AS participante,
       pr.pronostico_local,
       pr.pronostico_visitante,
-      pr.resultado_pronostico AS pronostico,
-      COALESCE(pr.criterio, 'Pendiente') AS criterio,
+      CASE
+        WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL
+        THEN CAST(pr.pronostico_local AS TEXT) || '-' || CAST(pr.pronostico_visitante AS TEXT)
+        ELSE 'SIN PRONÓSTICO'
+      END AS pronostico,
+      CASE
+        WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL
+        THEN 1 ELSE 0
+      END AS tiene_pronostico,
+      CASE
+        WHEN pr.pronostico_local IS NOT NULL AND pr.pronostico_visitante IS NOT NULL
+        THEN COALESCE(pr.criterio, 'Pendiente')
+        ELSE 'Sin pronóstico'
+      END AS criterio,
       COALESCE(pr.puntos, 0) AS puntos
-    FROM pronosticos pr
-    JOIN participantes pa ON pa.id_participante = pr.id_participante
-    WHERE pr.id_partido = ?
+    FROM participantes pa
+    LEFT JOIN pronosticos pr
+      ON pr.id_participante = pa.id_participante
+     AND pr.id_partido = ?
+    WHERE pa.activo = 1
     ORDER BY pa.nombre
   `).all(id);
 
   const pendientes = db.prepare(`
     SELECT pa.nombre AS participante
     FROM participantes pa
+    LEFT JOIN pronosticos pr
+      ON pr.id_participante = pa.id_participante
+     AND pr.id_partido = ?
     WHERE pa.activo = 1
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pronosticos pr
-        WHERE pr.id_participante = pa.id_participante
-          AND pr.id_partido = ?
+      AND (
+        pr.id_pronostico IS NULL
+        OR pr.pronostico_local IS NULL
+        OR pr.pronostico_visitante IS NULL
       )
     ORDER BY pa.nombre
   `).all(id);
 
-  res.json({ partido, registrados, pendientes });
+  const totalParticipantes = registrados.length;
+  const recibidos = registrados.filter(r => r.tiene_pronostico === 1).length;
+  const faltantes = pendientes.length;
+  const completo = totalParticipantes > 0 && recibidos === totalParticipantes;
+
+  res.json({
+    partido,
+    registrados,
+    pendientes,
+    resumen: {
+      totalParticipantes,
+      recibidos,
+      faltantes,
+      completo
+    }
+  });
 });
 
 app.get('/api/admin/pronostico', (req, res) => {

@@ -64,6 +64,17 @@ async function cargarControl() {
   `).join('');
 }
 
+function estadoPronosticoTexto(r) {
+  if (!r || Number(r.tiene_pronostico) !== 1) return 'SIN PRONÓSTICO';
+  return r.pronostico || `${r.pronostico_local}-${r.pronostico_visitante}`;
+}
+
+function claseEstadoResumen(resumen) {
+  if (resumen.completo) return '✅ Completo';
+  if (resumen.recibidos === 0) return '🟡 Faltan todos';
+  return '🟡 Faltan participantes';
+}
+
 async function cargarDetallePartido() {
   const id = Number(document.getElementById('partidoResultado').value);
   if (!id) return;
@@ -73,21 +84,26 @@ async function cargarDetallePartido() {
     if (data.error) throw new Error(data.error);
 
     const p = data.partido;
+    const resumen = data.resumen || { totalParticipantes: 0, recibidos: 0, faltantes: 0, completo: false };
     document.getElementById('detallePartidoResumen').innerHTML = `
       <b>${p.partido}</b><br>
       <span class="badgeSoft">${p.fecha} ${p.hora || ''}</span>
       <span class="badgeSoft">${p.estado}</span>
       ${p.resultado ? `<span class="badgeSoft">Resultado: ${p.resultado}</span>` : ''}
+      <br><br>
+      <span class="badgeSoft">Pronósticos recibidos: ${resumen.recibidos}/${resumen.totalParticipantes}</span>
+      <span class="badgeSoft">Faltantes: ${resumen.faltantes}/${resumen.totalParticipantes}</span>
+      <span class="badgeSoft">${claseEstadoResumen(resumen)}</span>
     `;
 
     document.getElementById('registradosPartido').innerHTML = (data.registrados || []).map(r => `
       <tr>
         <td>${r.participante}</td>
-        <td>${r.pronostico || `${r.pronostico_local}-${r.pronostico_visitante}`}</td>
-        <td>${r.criterio || 'Pendiente'}</td>
+        <td>${estadoPronosticoTexto(r)}</td>
+        <td>${r.criterio || (Number(r.tiene_pronostico) === 1 ? 'Pendiente' : 'Sin pronóstico')}</td>
         <td>${r.puntos || 0}</td>
       </tr>
-    `).join('') || '<tr><td colspan="4">Sin pronósticos registrados</td></tr>';
+    `).join('') || '<tr><td colspan="4">Sin participantes</td></tr>';
 
     document.getElementById('pendientesPartido').innerHTML = (data.pendientes || []).map(r => `
       <tr><td>${r.participante}</td></tr>
@@ -184,7 +200,7 @@ async function buscarPronostico() {
   } catch (err) {
     document.getElementById('pronLocal').value = '';
     document.getElementById('pronVisitante').value = '';
-    document.getElementById('editarMsg').textContent = err.message + '. Puedes registrar uno nuevo usando los campos.';
+    document.getElementById('editarMsg').textContent = 'Sin pronóstico registrado. Puedes registrar uno nuevo usando los campos.';
   }
 }
 

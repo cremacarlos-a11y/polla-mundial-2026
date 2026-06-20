@@ -140,3 +140,47 @@ http://localhost:3000/admin.html
 - Dashboard lee directo de SQLite/API.
 - Ya no usa ranking.json ni partidos.json.
 - Endpoints: /api/ranking, /api/dashboard, /api/partidos-dashboard, /api/detalle-participante/:nombre.
+
+
+## App v3.1 - Dashboard mejorado
+- Recupera pronósticos por participante con combo.
+- Separa evaluados y pendientes.
+- Mantiene lectura desde SQLite/API sin JSON.
+
+
+## App v3.2 - Administración avanzada
+
+Cambios principales:
+- Revertir resultado a pendiente desde /admin.html.
+- Guardar o actualizar resultado registrado.
+- Recalcular ranking manualmente.
+- Ver quién pronosticó y quién falta por partido.
+- Editar o crear pronóstico de participante desde el panel administrador.
+- Todo protegido por ADMIN_PIN.
+
+Archivos modificados:
+- server.js
+- public/admin.html
+- public/admin.js
+
+Endpoints nuevos:
+- POST /api/admin/revertir-resultado
+- POST /api/admin/recalcular-ranking
+- GET /api/admin/control-partido/:id
+- GET /api/admin/pronostico
+- POST /api/admin/editar-pronostico
+
+
+## App v3.2.1 - Corrección administrativa
+
+Cambios:
+- Muestra SIN PRONÓSTICO cuando el pronóstico está vacío o nulo.
+- Corrige Faltantes por partido considerando registros nulos como pendientes.
+- Agrega contador Pronósticos recibidos X/8 y Faltantes X/8.
+- Evita asignar puntos a pronósticos nulos al recalcular resultados.
+- Mejora mensaje al buscar un pronóstico inexistente.
+
+Archivos modificados:
+- server.js
+- public/admin.js
+- README.txt
