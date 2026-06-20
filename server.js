@@ -71,6 +71,41 @@ app.post('/api/login', (req, res) => {
 });
 
 
+
+app.post('/api/cambiar-pin', (req, res) => {
+  const { participante, pin_actual, nuevo_pin, confirmar_pin } = req.body;
+
+  if (!participante || !pin_actual || !nuevo_pin || !confirmar_pin) {
+    return res.status(400).json({ error: 'Debe completar todos los campos.' });
+  }
+
+  if (!/^\d{4}$/.test(String(nuevo_pin))) {
+    return res.status(400).json({ error: 'El nuevo PIN debe tener exactamente 4 dígitos numéricos.' });
+  }
+
+  if (String(nuevo_pin) !== String(confirmar_pin)) {
+    return res.status(400).json({ error: 'La confirmación del PIN no coincide.' });
+  }
+
+  if (String(pin_actual) === String(nuevo_pin)) {
+    return res.status(400).json({ error: 'El nuevo PIN debe ser diferente al PIN actual.' });
+  }
+
+  const user = getParticipantePorCredenciales(participante, pin_actual);
+  if (!user) {
+    return res.status(401).json({ error: 'PIN actual incorrecto.' });
+  }
+
+  db.prepare(`
+    UPDATE participantes
+    SET pin = ?
+    WHERE id_participante = ?
+  `).run(String(nuevo_pin), user.id_participante);
+
+  res.json({ ok: true, mensaje: 'PIN actualizado correctamente.' });
+});
+
+
 app.post('/api/mis-pronosticos', (req, res) => {
   const { participante, pin } = req.body;
   const user = getParticipantePorCredenciales(participante, pin);

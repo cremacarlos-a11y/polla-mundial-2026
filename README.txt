@@ -208,3 +208,21 @@ Pasos recomendados:
 4. Reiniciar:
    npm start
 5. Subir cambios a GitHub/Render.
+
+
+## App v3.3 - PIN participante y dashboard paginado
+
+Cambios:
+- Cada participante puede cambiar su propio PIN desde la pantalla principal.
+- Validación de PIN: 4 dígitos, numérico, confirmación obligatoria y distinto al PIN actual.
+- Nuevo endpoint:
+  POST /api/cambiar-pin
+- Dashboard: las tablas de pronósticos evaluados y pendientes se paginan de 8 en 8.
+- Se agregan controles Anterior/Siguiente en el detalle por participante.
+
+Archivos modificados:
+- server.js
+- public/index.html
+- public/app.js
+- public/dashboard.html
+- README.txt

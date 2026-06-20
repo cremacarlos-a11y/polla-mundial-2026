@@ -22,6 +22,11 @@
 .section-title{margin:18px 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.section-title h3{margin:0;font-size:20px}.count-badge{background:rgba(255,255,255,.10);color:#dcecff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900}
 .notice{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.25);color:#ffe2a3;border-radius:14px;padding:12px;margin-top:14px;font-size:13px;line-height:1.45}
 @media(max-width:1000px){.grid-kpi,.mainDash,.player-panel,.match-grid{grid-template-columns:1fr}.dashboardHero h1{font-size:29px}}
+
+.pager{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:10px 0 18px;flex-wrap:wrap}
+.pager button{padding:8px 12px;border-radius:12px;margin:0}
+.pager span{color:#dcecff;font-size:13px;font-weight:850}
+
 </style>
 </head>
 <body>
@@ -48,14 +53,16 @@
 <div class="notice">El detalle se actualiza automáticamente desde SQLite. Al registrar un resultado en Administración, se recalculan los puntos.</div></div>
 <div>
 <div class="section-title"><h3>✅ Pronósticos evaluados</h3><span class="count-badge" id="countEvaluados">0</span></div>
-<div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Partido</th><th>Pronóstico</th><th>Resultado</th><th>Criterio</th><th>Puntos</th></tr></thead><tbody id="playerEvaluados"></tbody></table></div>
+<div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Partido</th><th>Pronóstico</th><th>Resultado</th><th>Criterio</th><th>Puntos</th></tr></thead><tbody id="playerEvaluados"></tbody></table></div><div class="pager" id="pagerEvaluados"></div>
 <div class="section-title"><h3>⏳ Pronósticos pendientes</h3><span class="count-badge" id="countPendientes">0</span></div>
-<div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Partido</th><th>Pronóstico</th><th>Estado</th></tr></thead><tbody id="playerPendientes"></tbody></table></div>
+<div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Partido</th><th>Pronóstico</th><th>Estado</th></tr></thead><tbody id="playerPendientes"></tbody></table></div><div class="pager" id="pagerPendientes"></div>
 </div></section></details>
 <details class="card collapsible"><summary><span>🧾 Últimos resultados y regla vigente <span class="summary-sub">Contraído por defecto</span></span><span>⌄</span></summary><section class="mainDash"><div><h2>🧾 Últimos resultados</h2><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th>Resultado</th></tr></thead><tbody id="lastResults"></tbody></table></div></div><div><h2>📜 Regla vigente</h2><p class="msg">Ganador/Empate = 2 · Score exacto = +4 · Máximo = 6</p><p class="muted">El dashboard ya no usa ranking.json ni partidos.json. Lee directamente desde SQLite.</p></div></section></details>
 </div>
 <script>
 let RANKING=[],DASH=null,PARTIDOS=null,currentMatchFilter='proximos';
+let PLAYER_EVALUADOS=[], PLAYER_PENDIENTES=[], PAGE_EVALUADOS=1, PAGE_PENDIENTES=1;
+const PAGE_SIZE_DETALLE=8;
 const medal=p=>Number(p)===1?'🥇':Number(p)===2?'🥈':Number(p)===3?'🥉':p;const safeNum=n=>Number(n||0);
 function fmtDate(s){if(!s)return'--';const p=String(s).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:s}
 function fmtShort(s){if(!s)return'--';const p=String(s).split('-');return p.length===3?`${p[2]}/${p[1]}`:s}
@@ -64,7 +71,72 @@ function actualizarFechaLocal(){const ahora=new Date();document.getElementById('
 function renderRanking(){const leader=RANKING[0]||{},m=DASH?.metricas||{};document.getElementById('updated').textContent=`Actualizado: ${new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}`;document.getElementById('leader').textContent=leader.participante||'--';document.getElementById('leaderPts').textContent=`${leader.puntos||0} puntos`;document.getElementById('matches').textContent=m.partidos_jugados||0;document.getElementById('predictions').textContent=m.pronosticos_registrados||0;document.getElementById('exactos').textContent=m.score_exactos||0;document.getElementById('rankingBody').innerHTML=RANKING.map(r=>`<tr><td><span class="medal">${medal(r.posicion)}</span></td><td>${r.participante}</td><td>${r.puntos}</td><td>${r.scoreExactos}</td><td>${r.ganadorEmpate}</td><td>${r.partidos}</td></tr>`).join('');const max=Math.max(...RANKING.map(r=>safeNum(r.puntos)),1);document.getElementById('bars').innerHTML=RANKING.map(r=>`<div class="bar-row"><div class="bar-top"><span>${medal(r.posicion)} ${r.participante}</span><span>${r.puntos} pts</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(4,safeNum(r.puntos)/max*100)}%"></div></div></div>`).join('');const sel=document.getElementById('participantSelect');sel.innerHTML=RANKING.map(r=>`<option value="${r.participante}">${r.participante}</option>`).join('');sel.onchange=()=>renderPlayer(sel.value);if(RANKING[0])renderPlayer(RANKING[0].participante)}
 function isFinal(x){return String(x.estado||'').toLowerCase().includes('final')||x.resultado}
 function renderMatches(){let arr=[];if(currentMatchFilter==='finalizados')arr=(PARTIDOS?.finalizadosRecientes||[]).slice(-4).reverse();if(currentMatchFilter==='proximos')arr=(PARTIDOS?.proximosPartidos||[]).slice(0,4);if(currentMatchFilter==='pendientes')arr=(PARTIDOS?.proximosPartidos||[]);document.getElementById('matchGrid').innerHTML=arr.map(m=>`<div class="match-card"><div class="match-date">${fmtDate(m.fecha)} · ${m.hora||'--'} · Grupo ${m.grupo||'-'}</div><div class="teams">${m.local} vs ${m.visitante}</div><div><span class="pill ${isFinal(m)?'final':''}">${m.estado||'Próximo'}</span> ${m.resultado?`<span class="pill final">${m.resultado}</span>`:''}</div></div>`).join('')||'<div class="match-card"><div class="teams">Sin partidos para mostrar</div></div>';document.getElementById('lastResults').innerHTML=(PARTIDOS?.finalizadosRecientes||[]).slice(-4).reverse().map(r=>`<tr><td>${fmtDate(r.fecha)}</td><td>${r.partido}</td><td>${r.resultado}</td></tr>`).join('')||'<tr><td colspan="3">Sin resultados disponibles</td></tr>'}
-async function renderPlayer(nombre){const data=await fetch('/api/detalle-participante/'+encodeURIComponent(nombre)).then(r=>r.json());const r=data.ranking||{},rows=data.detalle||[];const evaluados=rows.filter(x=>String(x.estado||'').toLowerCase()==='registrado'||(x.resultado&&x.resultado!==''));const pendientes=rows.filter(x=>!(String(x.estado||'').toLowerCase()==='registrado'||(x.resultado&&x.resultado!=='')));document.getElementById('pPos').textContent=r.posicion?medal(r.posicion):'--';document.getElementById('pPts').textContent=r.puntos??'--';document.getElementById('pExact').textContent=r.scoreExactos??0;document.getElementById('pWin').textContent=r.ganadorEmpate??0;document.getElementById('pEvaluados').textContent=evaluados.length;document.getElementById('pPendientes').textContent=pendientes.length;document.getElementById('countEvaluados').textContent=evaluados.length;document.getElementById('countPendientes').textContent=pendientes.length;document.getElementById('playerEvaluados').innerHTML=evaluados.map(d=>`<tr><td>${fmtShort(d.fecha)}</td><td>${d.hora||'--'}</td><td>${d.partido}</td><td>${d.pronostico||'-'}</td><td>${d.resultado||'--'}</td><td><span class="criterio ${cls(d.criterio)}">${d.criterio||'Sin puntos'}</span></td><td>${d.puntos||0}</td></tr>`).join('')||'<tr><td colspan="7">Sin pronósticos evaluados</td></tr>';document.getElementById('playerPendientes').innerHTML=pendientes.map(d=>`<tr><td>${fmtShort(d.fecha)}</td><td>${d.hora||'--'}</td><td>${d.partido}</td><td>${d.pronostico||'-'}</td><td><span class="criterio pendiente">${d.estado||'Pendiente'}</span></td></tr>`).join('')||'<tr><td colspan="5">Sin pronósticos pendientes</td></tr>'}
+
+function slicePage(arr, page){
+  const start = (page - 1) * PAGE_SIZE_DETALLE;
+  return arr.slice(start, start + PAGE_SIZE_DETALLE);
+}
+
+function renderPager(id, total, page, setterName){
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE_DETALLE));
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (total <= PAGE_SIZE_DETALLE) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `
+    <button class="secondary" onclick="${setterName}(${Math.max(1, page - 1)})" ${page <= 1 ? 'disabled' : ''}>Anterior</button>
+    <span>Página ${page} de ${pages} · ${total} registros</span>
+    <button class="secondary" onclick="${setterName}(${Math.min(pages, page + 1)})" ${page >= pages ? 'disabled' : ''}>Siguiente</button>
+  `;
+}
+
+function setPageEvaluados(page){
+  PAGE_EVALUADOS = page;
+  renderPlayerTables();
+}
+
+function setPagePendientes(page){
+  PAGE_PENDIENTES = page;
+  renderPlayerTables();
+}
+
+function renderPlayerTables(){
+  const evaluadosPage = slicePage(PLAYER_EVALUADOS, PAGE_EVALUADOS);
+  const pendientesPage = slicePage(PLAYER_PENDIENTES, PAGE_PENDIENTES);
+
+  document.getElementById('playerEvaluados').innerHTML = evaluadosPage.map(d=>`<tr><td>${fmtShort(d.fecha)}</td><td>${d.hora||'--'}</td><td>${d.partido}</td><td>${d.pronostico||'-'}</td><td>${d.resultado||'--'}</td><td><span class="criterio ${cls(d.criterio)}">${d.criterio||'Sin puntos'}</span></td><td>${d.puntos||0}</td></tr>`).join('')||'<tr><td colspan="7">Sin pronósticos evaluados</td></tr>';
+
+  document.getElementById('playerPendientes').innerHTML = pendientesPage.map(d=>`<tr><td>${fmtShort(d.fecha)}</td><td>${d.hora||'--'}</td><td>${d.partido}</td><td>${d.pronostico||'-'}</td><td><span class="criterio pendiente">${d.estado||'Pendiente'}</span></td></tr>`).join('')||'<tr><td colspan="5">Sin pronósticos pendientes</td></tr>';
+
+  renderPager('pagerEvaluados', PLAYER_EVALUADOS.length, PAGE_EVALUADOS, 'setPageEvaluados');
+  renderPager('pagerPendientes', PLAYER_PENDIENTES.length, PAGE_PENDIENTES, 'setPagePendientes');
+}
+
+async function renderPlayer(nombre){
+  const data=await fetch('/api/detalle-participante/'+encodeURIComponent(nombre)).then(r=>r.json());
+  const r=data.ranking||{},rows=data.detalle||[];
+  const evaluados=rows.filter(x=>String(x.estado||'').toLowerCase()==='registrado'||(x.resultado&&x.resultado!==''));
+  const pendientes=rows.filter(x=>!(String(x.estado||'').toLowerCase()==='registrado'||(x.resultado&&x.resultado!=='')));
+
+  PLAYER_EVALUADOS = evaluados;
+  PLAYER_PENDIENTES = pendientes;
+  PAGE_EVALUADOS = 1;
+  PAGE_PENDIENTES = 1;
+
+  document.getElementById('pPos').textContent=r.posicion?medal(r.posicion):'--';
+  document.getElementById('pPts').textContent=r.puntos??'--';
+  document.getElementById('pExact').textContent=r.scoreExactos??0;
+  document.getElementById('pWin').textContent=r.ganadorEmpate??0;
+  document.getElementById('pEvaluados').textContent=evaluados.length;
+  document.getElementById('pPendientes').textContent=pendientes.length;
+  document.getElementById('countEvaluados').textContent=evaluados.length;
+  document.getElementById('countPendientes').textContent=pendientes.length;
+
+  renderPlayerTables();
+}
+
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentMatchFilter=btn.dataset.filter;renderMatches()}));
 async function init(){actualizarFechaLocal();setInterval(actualizarFechaLocal,60000);const [ranking,dashboard,partidos]=await Promise.all([fetch('/api/ranking').then(r=>r.json()),fetch('/api/dashboard').then(r=>r.json()),fetch('/api/partidos-dashboard').then(r=>r.json())]);RANKING=ranking;DASH=dashboard;PARTIDOS=partidos;renderRanking();renderMatches()}
 init();

@@ -201,3 +201,68 @@ function salir() {
 }
 
 init();
+
+
+
+function mostrarCambioPin() {
+  const card = document.getElementById('cambiarPinCard');
+  if (!card) return;
+  card.classList.remove('hidden');
+  document.getElementById('cambioPinMsg').textContent = '';
+  document.getElementById('pinActualCambio').value = '';
+  document.getElementById('nuevoPinCambio').value = '';
+  document.getElementById('confirmarPinCambio').value = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ocultarCambioPin() {
+  const card = document.getElementById('cambiarPinCard');
+  if (card) card.classList.add('hidden');
+}
+
+async function cambiarPin() {
+  if (!session) return;
+
+  const pinActual = document.getElementById('pinActualCambio').value.trim();
+  const nuevoPin = document.getElementById('nuevoPinCambio').value.trim();
+  const confirmarPin = document.getElementById('confirmarPinCambio').value.trim();
+  const msg = document.getElementById('cambioPinMsg');
+
+  msg.textContent = '';
+
+  if (!/^\d{4}$/.test(nuevoPin)) {
+    msg.textContent = 'El nuevo PIN debe tener exactamente 4 dígitos.';
+    return;
+  }
+
+  if (nuevoPin !== confirmarPin) {
+    msg.textContent = 'La confirmación del PIN no coincide.';
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/cambiar-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        participante: session.participante,
+        pin_actual: pinActual,
+        nuevo_pin: nuevoPin,
+        confirmar_pin: confirmarPin
+      })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'No se pudo cambiar el PIN.');
+
+    msg.innerHTML = '✅ PIN actualizado correctamente. Vuelve a ingresar con tu nuevo PIN.';
+    session.pin = nuevoPin;
+
+    document.getElementById('pinActualCambio').value = '';
+    document.getElementById('nuevoPinCambio').value = '';
+    document.getElementById('confirmarPinCambio').value = '';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+}
+
