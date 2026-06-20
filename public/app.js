@@ -9,6 +9,12 @@ async function init() {
   const participantes = await fetch('/api/participantes').then(r => r.json());
   $('participante').innerHTML = '<option value="">Seleccionar...</option>' +
     participantes.map(p => `<option>${p.nombre}</option>`).join('');
+
+  const participanteCambio = document.getElementById('participanteCambio');
+  if (participanteCambio) {
+    participanteCambio.innerHTML = '<option value="">Seleccionar...</option>' +
+      participantes.map(p => `<option>${p.nombre}</option>`).join('');
+  }
 }
 
 async function login() {
@@ -203,10 +209,33 @@ function salir() {
 init();
 
 
+function mostrarCambioPinLogin() {
+  const card = document.getElementById('cambiarPinCard');
+  if (!card) return;
+
+  const participanteSeleccionado = document.getElementById('participante')?.value || '';
+  const participanteCambio = document.getElementById('participanteCambio');
+  if (participanteCambio && participanteSeleccionado) {
+    participanteCambio.value = participanteSeleccionado;
+  }
+
+  card.classList.remove('hidden');
+  document.getElementById('cambioPinMsg').textContent = '';
+  document.getElementById('pinActualCambio').value = '';
+  document.getElementById('nuevoPinCambio').value = '';
+  document.getElementById('confirmarPinCambio').value = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function mostrarCambioPin() {
   const card = document.getElementById('cambiarPinCard');
   if (!card) return;
+
+  const participanteCambio = document.getElementById('participanteCambio');
+  if (participanteCambio && session?.participante) {
+    participanteCambio.value = session.participante;
+  }
+
   card.classList.remove('hidden');
   document.getElementById('cambioPinMsg').textContent = '';
   document.getElementById('pinActualCambio').value = '';
@@ -221,14 +250,23 @@ function ocultarCambioPin() {
 }
 
 async function cambiarPin() {
-  if (!session) return;
-
+  const participante = document.getElementById('participanteCambio')?.value || session?.participante || '';
   const pinActual = document.getElementById('pinActualCambio').value.trim();
   const nuevoPin = document.getElementById('nuevoPinCambio').value.trim();
   const confirmarPin = document.getElementById('confirmarPinCambio').value.trim();
   const msg = document.getElementById('cambioPinMsg');
 
   msg.textContent = '';
+
+  if (!participante) {
+    msg.textContent = 'Debe seleccionar un participante.';
+    return;
+  }
+
+  if (!/^\d{4}$/.test(pinActual)) {
+    msg.textContent = 'El PIN actual debe tener 4 dígitos.';
+    return;
+  }
 
   if (!/^\d{4}$/.test(nuevoPin)) {
     msg.textContent = 'El nuevo PIN debe tener exactamente 4 dígitos.';
@@ -245,7 +283,7 @@ async function cambiarPin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        participante: session.participante,
+        participante,
         pin_actual: pinActual,
         nuevo_pin: nuevoPin,
         confirmar_pin: confirmarPin
@@ -255,8 +293,16 @@ async function cambiarPin() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || 'No se pudo cambiar el PIN.');
 
-    msg.innerHTML = '✅ PIN actualizado correctamente. Vuelve a ingresar con tu nuevo PIN.';
-    session.pin = nuevoPin;
+    msg.innerHTML = '✅ PIN actualizado correctamente. Ya puedes ingresar con tu nuevo PIN.';
+
+    if (session && session.participante === participante) {
+      session.pin = nuevoPin;
+    }
+
+    const loginParticipante = document.getElementById('participante');
+    const loginPin = document.getElementById('pin');
+    if (loginParticipante) loginParticipante.value = participante;
+    if (loginPin) loginPin.value = nuevoPin;
 
     document.getElementById('pinActualCambio').value = '';
     document.getElementById('nuevoPinCambio').value = '';

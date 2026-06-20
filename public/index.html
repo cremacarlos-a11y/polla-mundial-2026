@@ -25,6 +25,7 @@
     <input id="pin" type="password" placeholder="Ingresa tu PIN">
 
     <button onclick="login()">Entrar</button>
+    <button id="btnMostrarCambioPinLogin" class="secondary" onclick="mostrarCambioPinLogin()">Cambiar PIN</button>
     <div id="loginMsg" class="msg"></div>
   </section>
 
@@ -32,6 +33,7 @@
     <div class="topline">
       <h2 id="tituloPronosticos">Tus partidos pendientes</h2>
       <button class="secondary" onclick="salir()">Cambiar participante</button>
+      <button class="secondary" onclick="mostrarCambioPin()">Cambiar PIN</button>
     </div>
 
     <div class="rules">
@@ -56,6 +58,30 @@
     </div>
     <div id="saveMsg" class="msg"></div><div class="section"><h2>📋 Mis pronósticos registrados</h2><div id="misPronosticos"></div></div>
   </section>
+
+  <section id="cambiarPinCard" class="card hidden">
+    <h2>🔑 Cambiar PIN</h2>
+    <p class="muted">Selecciona tu participante, ingresa tu PIN actual y define un nuevo PIN de 4 dígitos.</p>
+
+    <label>Participante</label>
+    <select id="participanteCambio"></select>
+
+    <label>PIN actual</label>
+    <input id="pinActualCambio" type="password" maxlength="4" inputmode="numeric" placeholder="PIN actual">
+
+    <label>Nuevo PIN</label>
+    <input id="nuevoPinCambio" type="password" maxlength="4" inputmode="numeric" placeholder="Nuevo PIN de 4 dígitos">
+
+    <label>Confirmar nuevo PIN</label>
+    <input id="confirmarPinCambio" type="password" maxlength="4" inputmode="numeric" placeholder="Confirmar nuevo PIN">
+
+    <div class="actions">
+      <button onclick="cambiarPin()">Guardar nuevo PIN</button>
+      <button class="secondary" onclick="ocultarCambioPin()">Cancelar</button>
+    </div>
+    <div id="cambioPinMsg" class="msg"></div>
+  </section>
+
 </div>
 
 <script src="app.js"></script>
