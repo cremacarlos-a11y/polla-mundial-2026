@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administración - Polla Mundial 2026</title>
 <link rel="stylesheet" href="styles.css">
+<style>
+.adminGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.adminActions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.dangerBtn{background:linear-gradient(90deg,#ff7a7a,#ffb86b)!important;color:#08131f!important}
+.warningBox{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.25);color:#ffe2a3;border-radius:14px;padding:12px;margin-top:12px}
+.compactInputs{display:grid;grid-template-columns:1fr 70px 30px 70px auto;gap:10px;align-items:end}
+.smallSelect{min-height:48px!important}
+.badgeSoft{display:inline-block;border-radius:999px;padding:5px 10px;background:rgba(255,255,255,.10);font-size:12px;font-weight:900;color:#dbeeff}
+@media(max-width:900px){.adminGrid,.compactInputs{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 <div class="container">
@@ -15,34 +25,93 @@
     </div>
     <div class="navlinks">
       <a class="link" href="/">Pronósticos</a>
-      <a class="link secondaryLink" href="/dashboard.html">Ranking</a>
+      <a class="link secondaryLink" href="/dashboard.html">Dashboard</a>
     </div>
   </section>
 
-  <section class="gridCards">
+  <section class="adminGrid">
     <div class="card">
       <h2>📊 Indicadores</h2>
       <div id="metricas"></div>
+      <div class="adminActions">
+        <button onclick="recalcularRanking()">🔁 Recalcular ranking</button>
+      </div>
+      <div id="recalculoMsg" class="msg"></div>
     </div>
+
     <div class="card">
       <h2>🔐 PIN Administrador</h2>
       <label>PIN</label>
-      <input id="adminPin" type="password" value="admin2026">
-      <div class="msg">Ingrese sus credenciales de administrador.</div>
+      <input id="adminPin" type="password" placeholder="PIN administrador">
+      <div class="msg">Ingrese sus credenciales de administrador para guardar cambios sensibles.</div>
     </div>
   </section>
 
   <section class="card">
-    <h2>⚽ Registrar resultado</h2>
+    <h2>⚽ Resultado del partido</h2>
     <label>Partido</label>
-    <select id="partidoResultado"></select>
+    <select id="partidoResultado" onchange="cargarDetallePartido()"></select>
+
     <div class="scoreAdmin">
       <input id="golesLocal" type="number" min="0" placeholder="Local">
       <strong>-</strong>
       <input id="golesVisitante" type="number" min="0" placeholder="Visitante">
-      <button onclick="guardarResultado()">Guardar resultado</button>
+      <button onclick="guardarResultado()">Guardar / actualizar resultado</button>
     </div>
+
+    <div class="adminActions">
+      <button class="dangerBtn" onclick="revertirResultado()">↩ Revertir resultado a pendiente</button>
+      <button onclick="cargarDetallePartido()">🔎 Ver quién pronosticó</button>
+    </div>
+
     <div id="resultadoMsg" class="msg"></div>
+  </section>
+
+  <section class="adminGrid">
+    <div class="card">
+      <h2>✅ Pronósticos registrados del partido</h2>
+      <div id="detallePartidoResumen" class="warningBox">Selecciona un partido para ver el detalle.</div>
+      <div class="tableWrap">
+        <table>
+          <thead><tr><th>Participante</th><th>Pronóstico</th><th>Criterio</th><th>Puntos</th></tr></thead>
+          <tbody id="registradosPartido"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⏳ Faltantes por partido</h2>
+      <div class="tableWrap">
+        <table>
+          <thead><tr><th>Participante pendiente</th></tr></thead>
+          <tbody id="pendientesPartido"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>✏️ Editar pronóstico de participante</h2>
+    <div class="compactInputs">
+      <div>
+        <label>Participante</label>
+        <select id="participanteEditar" class="smallSelect"></select>
+      </div>
+      <div>
+        <label>Local</label>
+        <input id="pronLocal" type="number" min="0" placeholder="0">
+      </div>
+      <strong>-</strong>
+      <div>
+        <label>Visitante</label>
+        <input id="pronVisitante" type="number" min="0" placeholder="0">
+      </div>
+      <button onclick="editarPronostico()">Guardar pronóstico</button>
+    </div>
+    <div class="adminActions">
+      <button onclick="buscarPronostico()">🔎 Buscar pronóstico actual</button>
+    </div>
+    <div id="editarMsg" class="msg"></div>
   </section>
 
   <section class="card">

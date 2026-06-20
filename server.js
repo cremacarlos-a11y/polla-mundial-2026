@@ -300,7 +300,7 @@ app.get('/api/control-pronosticos', (req, res) => {
 app.post('/api/resultados', (req, res) => {
   const { id_partido, goles_local, goles_visitante, admin_pin } = req.body;
 
-  if (admin_pin !== (process.env.ADMIN_PIN || 'admin2026')) {
+  if (!validarAdminPin(admin_pin)) {
     return res.status(401).json({ error: 'PIN de administrador incorrecto.' });
   }
 
@@ -377,6 +377,290 @@ function recalcularPuntosPartido(idPartido, realLocal, realVisitante) {
 
   tx();
 }
+
+function validarAdminPin(pin) {
+  return pin === (process.env.ADMIN_PIN || 'admin2026');
+}
+
+function recalcularPronosticoIndividual(idPronostico, realLocal, realVisitante) {
+  const pr = db.prepare(`
+    SELECT id_pronostico, pronostico_local, pronostico_visitante
+    FROM pronosticos
+    WHERE id_pronostico = ?
+  `).get(idPronostico);
+
+  if (!pr) return;
+
+  const exacto = pr.pronostico_local === realLocal && pr.pronostico_visitante === realVisitante;
+  const aciertaSigno = signo(pr.pronostico_local, pr.pronostico_visitante) === signo(realLocal, realVisitante);
+
+  let criterio = 'Sin puntos';
+  let puntos = 0;
+
+  if (exacto) {
+    criterio = 'Score Exacto';
+    puntos = 6;
+  } else if (aciertaSigno) {
+    criterio = 'Ganador/Empate';
+    puntos = 2;
+  }
+
+  db.prepare(`
+    UPDATE pronosticos
+    SET criterio = ?, puntos = ?, estado_partido = 'Registrado'
+    WHERE id_pronostico = ?
+  `).run(criterio, puntos, idPronostico);
+}
+
+app.post('/api/admin/revertir-resultado', (req, res) => {
+  const { id_partido, admin_pin } = req.body;
+
+  if (!validarAdminPin(admin_pin)) {
+    return res.status(401).json({ error: 'PIN de administrador incorrecto.' });
+  }
+
+  const id = Number(id_partido);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: 'Partido inválido.' });
+  }
+
+  const partido = db.prepare('SELECT * FROM partidos WHERE id_partido = ?').get(id);
+  if (!partido) return res.status(404).json({ error: 'Partido no encontrado.' });
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO resultados (id_partido, goles_local, goles_visitante, resultado, estado, actualizado_en)
+      VALUES (?, NULL, NULL, NULL, 'Pendiente', CURRENT_TIMESTAMP)
+      ON CONFLICT(id_partido)
+      DO UPDATE SET
+        goles_local = NULL,
+        goles_visitante = NULL,
+        resultado = NULL,
+        estado = 'Pendiente',
+        actualizado_en = CURRENT_TIMESTAMP
+    `).run(id);
+
+    db.prepare(`UPDATE partidos SET estado = 'Próximo' WHERE id_partido = ?`).run(id);
+
+    db.prepare(`
+      UPDATE pronosticos
+      SET criterio = 'Pendiente',
+          puntos = 0,
+          estado_partido = 'Pendiente'
+      WHERE id_partido = ?
+    `).run(id);
+  });
+
+  tx();
+
+  res.json({
+    ok: true,
+    mensaje: 'Resultado revertido a pendiente.',
+    partido: `${partido.equipo_local} vs ${partido.equipo_visitante}`
+  });
+});
+
+app.post('/api/admin/recalcular-ranking', (req, res) => {
+  const { admin_pin } = req.body;
+
+  if (!validarAdminPin(admin_pin)) {
+    return res.status(401).json({ error: 'PIN de administrador incorrecto.' });
+  }
+
+  const resultados = db.prepare(`
+    SELECT id_partido, goles_local, goles_visitante
+    FROM resultados
+    WHERE estado = 'Registrado'
+      AND goles_local IS NOT NULL
+      AND goles_visitante IS NOT NULL
+  `).all();
+
+  for (const r of resultados) {
+    recalcularPuntosPartido(r.id_partido, r.goles_local, r.goles_visitante);
+  }
+
+  res.json({ ok: true, recalculados: resultados.length });
+});
+
+app.get('/api/admin/control-partido/:id', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: 'Partido inválido.' });
+  }
+
+  const partido = db.prepare(`
+    SELECT
+      p.id_partido,
+      p.fecha,
+      p.hora,
+      p.equipo_local || ' vs ' || p.equipo_visitante AS partido,
+      COALESCE(r.resultado, '') AS resultado,
+      COALESCE(r.estado, 'Pendiente') AS estado
+    FROM partidos p
+    LEFT JOIN resultados r ON r.id_partido = p.id_partido
+    WHERE p.id_partido = ?
+  `).get(id);
+
+  if (!partido) return res.status(404).json({ error: 'Partido no encontrado.' });
+
+  const registrados = db.prepare(`
+    SELECT
+      pa.nombre AS participante,
+      pr.pronostico_local,
+      pr.pronostico_visitante,
+      pr.resultado_pronostico AS pronostico,
+      COALESCE(pr.criterio, 'Pendiente') AS criterio,
+      COALESCE(pr.puntos, 0) AS puntos
+    FROM pronosticos pr
+    JOIN participantes pa ON pa.id_participante = pr.id_participante
+    WHERE pr.id_partido = ?
+    ORDER BY pa.nombre
+  `).all(id);
+
+  const pendientes = db.prepare(`
+    SELECT pa.nombre AS participante
+    FROM participantes pa
+    WHERE pa.activo = 1
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pronosticos pr
+        WHERE pr.id_participante = pa.id_participante
+          AND pr.id_partido = ?
+      )
+    ORDER BY pa.nombre
+  `).all(id);
+
+  res.json({ partido, registrados, pendientes });
+});
+
+app.get('/api/admin/pronostico', (req, res) => {
+  const idPartido = Number(req.query.id_partido);
+  const participante = String(req.query.participante || '');
+
+  if (!Number.isInteger(idPartido) || !participante) {
+    return res.status(400).json({ error: 'Debe indicar partido y participante.' });
+  }
+
+  const row = db.prepare(`
+    SELECT
+      pr.id_pronostico,
+      p.id_partido,
+      pa.nombre AS participante,
+      p.equipo_local,
+      p.equipo_visitante,
+      p.equipo_local || ' vs ' || p.equipo_visitante AS partido,
+      pr.pronostico_local,
+      pr.pronostico_visitante,
+      pr.resultado_pronostico,
+      COALESCE(pr.criterio, 'Pendiente') AS criterio,
+      COALESCE(pr.puntos, 0) AS puntos,
+      COALESCE(pr.estado_partido, 'Pendiente') AS estado_partido,
+      COALESCE(r.resultado, '') AS resultado,
+      COALESCE(r.estado, 'Pendiente') AS estado_resultado
+    FROM pronosticos pr
+    JOIN participantes pa ON pa.id_participante = pr.id_participante
+    JOIN partidos p ON p.id_partido = pr.id_partido
+    LEFT JOIN resultados r ON r.id_partido = p.id_partido
+    WHERE pr.id_partido = ?
+      AND pa.nombre = ?
+  `).get(idPartido, participante);
+
+  if (!row) return res.status(404).json({ error: 'Pronóstico no encontrado para ese participante y partido.' });
+  res.json(row);
+});
+
+app.post('/api/admin/editar-pronostico', (req, res) => {
+  const { id_partido, participante, pronostico_local, pronostico_visitante, admin_pin } = req.body;
+
+  if (!validarAdminPin(admin_pin)) {
+    return res.status(401).json({ error: 'PIN de administrador incorrecto.' });
+  }
+
+  const idPartido = Number(id_partido);
+  const gl = Number(pronostico_local);
+  const gv = Number(pronostico_visitante);
+
+  if (!Number.isInteger(idPartido) || !participante || !Number.isInteger(gl) || !Number.isInteger(gv)) {
+    return res.status(400).json({ error: 'Datos de pronóstico inválidos.' });
+  }
+
+  const partido = db.prepare('SELECT * FROM partidos WHERE id_partido = ?').get(idPartido);
+  if (!partido) return res.status(404).json({ error: 'Partido no encontrado.' });
+
+  const persona = db.prepare(`
+    SELECT id_participante, nombre
+    FROM participantes
+    WHERE nombre = ? AND activo = 1
+  `).get(participante);
+
+  if (!persona) return res.status(404).json({ error: 'Participante no encontrado.' });
+
+  const existente = db.prepare(`
+    SELECT id_pronostico
+    FROM pronosticos
+    WHERE id_partido = ? AND id_participante = ?
+  `).get(idPartido, persona.id_participante);
+
+  let idPronostico;
+
+  if (existente) {
+    idPronostico = existente.id_pronostico;
+    db.prepare(`
+      UPDATE pronosticos
+      SET pronostico_local = ?,
+          pronostico_visitante = ?,
+          resultado_pronostico = ?,
+          registrado_en = CURRENT_TIMESTAMP
+      WHERE id_pronostico = ?
+    `).run(gl, gv, `${gl}-${gv}`, idPronostico);
+  } else {
+    const info = db.prepare(`
+      INSERT INTO pronosticos (
+        id_partido,
+        id_participante,
+        pronostico_local,
+        pronostico_visitante,
+        resultado_pronostico,
+        criterio,
+        puntos,
+        estado_partido,
+        registrado_en
+      )
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 'Pendiente', CURRENT_TIMESTAMP)
+    `).run(idPartido, persona.id_participante, gl, gv, `${gl}-${gv}`);
+
+    idPronostico = info.lastInsertRowid;
+  }
+
+  const resultado = db.prepare(`
+    SELECT goles_local, goles_visitante, estado
+    FROM resultados
+    WHERE id_partido = ?
+  `).get(idPartido);
+
+  if (resultado && resultado.estado === 'Registrado') {
+    recalcularPronosticoIndividual(idPronostico, resultado.goles_local, resultado.goles_visitante);
+  } else {
+    db.prepare(`
+      UPDATE pronosticos
+      SET criterio = 'Pendiente', puntos = 0, estado_partido = 'Pendiente'
+      WHERE id_pronostico = ?
+    `).run(idPronostico);
+  }
+
+  const actualizado = db.prepare(`
+    SELECT resultado_pronostico, criterio, puntos, estado_partido
+    FROM pronosticos
+    WHERE id_pronostico = ?
+  `).get(idPronostico);
+
+  res.json({
+    ok: true,
+    participante: persona.nombre,
+    partido: `${partido.equipo_local} vs ${partido.equipo_visitante}`,
+    ...actualizado
+  });
+});
 
 
 app.get('/api/partidos-dashboard', (req, res) => {
