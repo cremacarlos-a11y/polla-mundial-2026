@@ -22,14 +22,24 @@ function getParticipantePorCredenciales(nombre, pin) {
   `).get(nombre, pin);
 }
 
-function partidoBloqueado(fecha, hora) {
-  // Bloqueo simple: compara fecha/hora local del servidor.
-  // Luego podemos ajustar zona horaria Lima si desplegamos.
-  if (!fecha) return false;
+function fechaHoraLimaToDate(fecha, hora) {
+  if (!fecha) return null;
+
   const h = hora || '00:00';
-  const inicio = new Date(`${fecha}T${h}:00`);
-  const ahora = new Date();
-  return ahora >= inicio;
+  const [yyyy, mm, dd] = String(fecha).split('-').map(Number);
+  const [HH, MM] = String(h).split(':').map(Number);
+
+  if (!yyyy || !mm || !dd || Number.isNaN(HH)) return null;
+
+  // Perú no usa horario de verano. Hora Lima = UTC-5.
+  // Para comparar correctamente en Render, convertimos la hora Perú a UTC.
+  return new Date(Date.UTC(yyyy, mm - 1, dd, HH + 5, MM || 0, 0));
+}
+
+function partidoBloqueado(fecha, hora) {
+  const inicio = fechaHoraLimaToDate(fecha, hora);
+  if (!inicio) return false;
+  return new Date() >= inicio;
 }
 
 app.get('/api/health', (req, res) => {

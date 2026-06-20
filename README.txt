@@ -184,3 +184,27 @@ Archivos modificados:
 - server.js
 - public/admin.js
 - README.txt
+
+
+## App v3.2.2 - Corrección de horarios Perú
+
+Cambios:
+- El bloqueo de pronósticos ahora compara fecha/hora en zona horaria Perú (America/Lima / UTC-5), evitando bloqueos anticipados en Render.
+- Se agrega script para corregir partidos cargados con +1 hora:
+  npm run corregir-horarios-peru
+
+Archivos modificados:
+- server.js
+- package.json
+- scripts/corregir_horarios_peru.js
+
+Pasos recomendados:
+1. Reemplazar server.js, package.json y scripts/corregir_horarios_peru.js.
+2. Ejecutar en local:
+   npm run corregir-horarios-peru
+3. Validar:
+   Netherlands vs Sweden debe quedar 12:00.
+   Germany vs Ivory Coast debe quedar 15:00.
+4. Reiniciar:
+   npm start
+5. Subir cambios a GitHub/Render.
