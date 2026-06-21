@@ -46,6 +46,25 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, app: 'Polla Mundial 2026', db: DB_PATH });
 });
 
+app.get('/api/admin/backup-db', (req, res) => {
+  const adminPin = req.query.admin_pin;
+
+  if (!validarAdminPin(adminPin)) {
+    return res.status(401).json({ error: 'PIN de administrador incorrecto.' });
+  }
+
+  const fileName = `polla_mundial_2026_backup_${new Date().toISOString().slice(0,10)}.db`;
+
+  res.download(DB_PATH, fileName, (err) => {
+    if (err) {
+      console.error('Error descargando backup:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'No se pudo descargar la base de datos.' });
+      }
+    }
+  });
+});
+
 app.get('/api/participantes', (req, res) => {
   const rows = db.prepare(`
     SELECT id_participante, nombre
